@@ -1,7 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
 namespace Antares;
 use Antares\Container\Container;
 use Antares\Exceptions\HttpException;
@@ -10,7 +8,6 @@ use Antares\Router\Router;
 use Exception;
 use Nyholm\Psr7\Response;
 use Psr\Http\Message\ServerRequestInterface;
-
 final class Dispatcher
 {
     public function __construct(
@@ -21,49 +18,35 @@ final class Dispatcher
 
     public function dispatch(
         ServerRequestInterface $request
-    ): Response
-    {
+    ): Response {
         $httpMethod = $request->getMethod();
         $uri = $request->getUri()->getPath();
-
         [$controllerClass, $methodName, $routeParams, $statusCode] = $this->router->match($httpMethod, $uri);
         $controller = $this->container->make($controllerClass);
         $reflection = new \ReflectionMethod($controller, $methodName);
         $parameters = $reflection->getParameters();
-
         $args = [];
         foreach ($parameters as $parameter) {
             $args[] = $this->resolveParameter($parameter, $routeParams, $request);
         }
         $result = $reflection->invokeArgs($controller, $args);
-
-        return new Response(
-            status: $statusCode,
-            headers: ['Content-Type' => 'application/json'],
-            body: json_encode($result),
-        );
-
+        return $this->buildResponse($result, $statusCode);
     }
 
     private function resolveParameter(
         \ReflectionParameter $parameter,
         array $routeParams,
         ServerRequestInterface $request,
-    ): mixed
-    {
-
+    ): mixed {
         $type = $parameter->getType();
         $typeName = $type->getName();
-
-
         if (isset($routeParams[$parameter->getName()])) {
             return $this->castRouteParam(
                 $routeParams[$parameter->getName()],
                 $type
             );
         }
-
-       if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+        if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
             if ((new \ReflectionClass($typeName))->isReadOnly()) {
                 return $this->hydrator->hydrate(
                     $typeName,
@@ -72,11 +55,10 @@ final class Dispatcher
             }
             return $this->container->make($typeName);
         }
-
         if ($parameter->isDefaultValueAvailable()) {
             return $parameter->getDefaultValue();
-        }else{
-            throw new Exception('could not resovle parameters');
+        } else {
+            throw new Exception('could not resolve parameters');
         }
     }
 
@@ -94,5 +76,23 @@ final class Dispatcher
                             : throw new HttpException(400, "Route parameter must be a valid boolean, got '{$value}'"),
             default => $value,
         };
+    }
+
+    private function buildResponse(mixed $result, int $statusCode): Response
+    {
+        if ($result instanceof Response) {
+            return $result;
+        }
+        $body = match(true) {
+            $result === null   => '',
+            is_array($result)  => json_encode($result),
+            is_object($result) => json_encode(get_object_vars($result)),
+            default            => json_encode($result),
+        };
+        return new Response(
+            status: $statusCode,
+            headers: ['Content-Type' => 'application/json'],
+            body: $body,
+        );
     }
 }
