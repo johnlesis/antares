@@ -2,6 +2,8 @@
 
 namespace Antares;
 
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Antares\Container\Container;
 use Antares\Hydration\Hydrator;
 use Antares\Router\Router;
@@ -9,10 +11,11 @@ use Antares\Validation\Validator;
 
 class Application
 {
-    private array $controllers = [];
     private array $providers = [];
     private string $basePath;
     private Container $container;
+    private Dispatcher $dispatcher;
+    private ErrorHandler $errorHandler;
 
     public static function create(string $basePath): static
     {
@@ -21,22 +24,29 @@ class Application
         return $app;
     }
 
-    public function controllers(array $controllers): static
-    {
-        $this->controllers = $controllers;
-        return $this;
-    }
-
     public function providers(array $providers): static
     {
         $this->providers = $providers;
         return $this;
     }
 
-    public function run(){
+    public function run(): void
+    {
+        $this->boot();
+
+        $factory = new \Nyholm\Psr7\Factory\Psr17Factory();
+        $creator = new \Nyholm\Psr7Server\ServerRequestCreator($factory, $factory, $factory, $factory);
+        $request = $creator->fromGlobals();
+
+        $response = $this->handle($request);
+        $this->emit($response);
+    }
+
+    public function boot(): void
+    {
         $this->container = new Container();
-        $router = new Router();
-        
+        $this->container->singleton(Router::class, fn() => new Router());
+
         foreach ($this->providers as $providerClass) {
             $provider = new $providerClass();
             if (!$provider instanceof ServiceProvider) {
@@ -44,27 +54,10 @@ class Application
             }
             $provider->register($this->container);
         }
-        
-        foreach($this->controllers as $controller)
-            {
-                $router->register($controller);
-            }
 
-        $dispatcher = new Dispatcher($this->container, $router, new Hydrator(new Validator()));
-
-        $factory = new \Nyholm\Psr7\Factory\Psr17Factory();
-        $creator = new \Nyholm\Psr7Server\ServerRequestCreator($factory, $factory, $factory, $factory);
-        $request = $creator->fromGlobals();
-
-        $errorHandler = new ErrorHandler();
-
-        try {
-            $response = $dispatcher->dispatch($request);
-        } catch (\Throwable $e) {
-            $response = $errorHandler->handle($e);
-        }
-
-        $this->emit($response);
+        $router = $this->container->make(Router::class);
+        $this->dispatcher = new Dispatcher($this->container, $router, new Hydrator(new Validator()));
+        $this->errorHandler = new ErrorHandler();
     }
 
     private function emit(\Psr\Http\Message\ResponseInterface $response): void
@@ -76,6 +69,15 @@ class Application
             }
         }
         echo $response->getBody();
+    }
+
+    public function handle(ServerRequestInterface $request): ResponseInterface
+    {
+        try {
+            return $this->dispatcher->dispatch($request);
+        } catch (\Throwable $e) {
+            return $this->errorHandler->handle($e);
+        }
     }
 
 }

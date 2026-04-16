@@ -14,7 +14,7 @@ final class RouteServiceProvider implements ServiceProvider
     {
         $router = $container->make(Router::class);
         
-        // $router->register(PatientController::class);
+        $router->register(PatientController::class);
         // $router->register(UserController::class);
     }
 }
