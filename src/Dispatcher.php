@@ -48,9 +48,18 @@ final class Dispatcher
         }
         if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
             if ((new \ReflectionClass($typeName))->isReadOnly()) {
+
+                $rawBody = (string) $request->getBody();
+
+                if (!empty($rawBody) && json_decode($rawBody) === null) {
+                    throw new HttpException(400, "Invalid JSON body");
+                }
+
+                $data = json_decode($rawBody, true) ?? [];
+
                 return $this->hydrator->hydrate(
                     $typeName,
-                    json_decode((string) $request->getBody(), true) ?? []
+                    $data
                 );
             }
             return $this->container->make($typeName);

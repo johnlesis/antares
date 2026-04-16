@@ -3,6 +3,7 @@
 namespace Antares;
 
 use Antares\Exceptions\HttpException;
+use Antares\Hydration\Exceptions\HydrationException;
 use Antares\Validation\Exceptions\ValidationException;
 use Nyholm\Psr7\Response;
 
@@ -11,6 +12,7 @@ class ErrorHandler{
     {
         $statusCode = match(true){
             $e instanceof ValidationException => 422,
+            $e instanceof HydrationException   => 400,
             $e instanceof HttpException => $e->getStatusCode(),
             default => 500
         };
