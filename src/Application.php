@@ -6,6 +6,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Antares\Container\Container;
 use Antares\Hydration\Hydrator;
+use Antares\Middleware\Pipeline;
 use Antares\Router\Router;
 use Antares\Validation\Validator;
 
@@ -16,6 +17,7 @@ class Application
     private Container $container;
     private Dispatcher $dispatcher;
     private ErrorHandler $errorHandler;
+    private array $middleware = [];
 
     public static function create(string $basePath): static
     {
@@ -27,6 +29,12 @@ class Application
     public function providers(array $providers): static
     {
         $this->providers = $providers;
+        return $this;
+    }
+
+    public function middleware(array $middleware): static
+    {
+        $this->middleware = $middleware;
         return $this;
     }
 
@@ -73,8 +81,13 @@ class Application
 
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
+        $pipeline = new Pipeline(
+            $this->middleware,
+            fn($request) => $this->dispatcher->dispatch($request),
+        );
+
         try {
-            return $this->dispatcher->dispatch($request);
+            return $pipeline->run($request);
         } catch (\Throwable $e) {
             return $this->errorHandler->handle($e);
         }
