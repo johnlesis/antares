@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Antares;
 use Antares\Container\Container;
+use Antares\Exceptions\HttpException;
 use Antares\Hydration\Hydrator;
 use Antares\Router\Router;
 use Exception;
@@ -82,9 +83,15 @@ final class Dispatcher
     private function castRouteParam(string $value, ?\ReflectionNamedType $type): mixed
     {
         return match($type?->getName()) {
-            'int'   => (int) $value,
-            'float' => (float) $value,
-            'bool'  => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            'int'   => filter_var($value, FILTER_VALIDATE_INT) !== false
+                            ? (int) $value
+                            : throw new HttpException(400, "Route parameter must be a valid integer, got '{$value}'"),
+            'float' => filter_var($value, FILTER_VALIDATE_FLOAT) !== false
+                            ? (float) $value
+                            : throw new HttpException(400, "Route parameter must be a valid float, got '{$value}'"),
+            'bool'  => filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) !== null
+                            ? filter_var($value, FILTER_VALIDATE_BOOLEAN)
+                            : throw new HttpException(400, "Route parameter must be a valid boolean, got '{$value}'"),
             default => $value,
         };
     }
