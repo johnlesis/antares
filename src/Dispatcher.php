@@ -39,36 +39,45 @@ final class Dispatcher
         ServerRequestInterface $request,
     ): mixed {
         $type = $parameter->getType();
-        $typeName = $type->getName();
-        if (isset($routeParams[$parameter->getName()])) {
-            return $this->castRouteParam(
-                $routeParams[$parameter->getName()],
-                $type
-            );
+
+        if (!$type instanceof \ReflectionNamedType) {
+            if ($parameter->isDefaultValueAvailable()) {
+                return $parameter->getDefaultValue();
+            }
+            throw new Exception('could not resolve parameters');
         }
-        if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+
+        $typeName = $type->getName();
+
+        if ($typeName === ServerRequestInterface::class) {
+            return $request;
+        }
+
+        if (isset($routeParams[$parameter->getName()])) {
+            return $this->castRouteParam($routeParams[$parameter->getName()], $type);
+        }
+
+        if (!$type->isBuiltin()) {
             if ((new \ReflectionClass($typeName))->isReadOnly()) {
-
                 $rawBody = (string) $request->getBody();
-
                 if (!empty($rawBody) && json_decode($rawBody) === null) {
                     throw new HttpException(400, "Invalid JSON body");
                 }
-
-                $data = json_decode($rawBody, true) ?? [];
-
-                return $this->hydrator->hydrate(
-                    $typeName,
-                    $data
-                );
+                return $this->hydrator->hydrate($typeName, json_decode($rawBody, true) ?? []);
             }
             return $this->container->make($typeName);
         }
+
+        $queryParams = $request->getQueryParams();
+        if (isset($queryParams[$parameter->getName()])) {
+            return $this->castRouteParam($queryParams[$parameter->getName()], $type);
+        }
+
         if ($parameter->isDefaultValueAvailable()) {
             return $parameter->getDefaultValue();
-        } else {
-            throw new Exception('could not resolve parameters');
         }
+
+        throw new Exception('could not resolve parameters');
     }
 
     private function castRouteParam(string $value, ?\ReflectionNamedType $type): mixed

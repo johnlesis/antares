@@ -9,11 +9,15 @@ use Antares\Router\Attributes\Post;
 class PatientController
 {
     #[Get('/patients')]
-    public function list(): array
+    public function list(int $page = 1, int $limit = 10): array
     {
         return [
-            ['id' => 1, 'name' => 'John Doe'],
-            ['id' => 2, 'name' => 'Jane Doe'],
+            'page'  => $page,
+            'limit' => $limit,
+            'data'  => [
+                ['id' => 1, 'name' => 'John Doe'],
+                ['id' => 2, 'name' => 'Jane Doe'],
+            ],
         ];
     }
 
@@ -23,12 +27,15 @@ class PatientController
         return ['id' => $id, 'name' => 'John Doe'];
     }
 
-    #[Post('/patients', statusCode: 201)]
-    public function create(CreatePatientRequest $body): array
+    #[Post('/patients')]
+    public function create(
+        CreatePatientRequest $body,    // from JSON body
+        ?string $source = null,        // from query string
+    ): array
     {
         return [
-            'name' => $body->name,
-            'age'  => $body->age,
+            'patient' => $body->name,
+            'source'  => $source,
         ];
     }
 }
