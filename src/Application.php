@@ -17,6 +17,7 @@ use Antares\Validation\Validator;
 class Application
 {
     private array $providers = [];
+    private array $routeProviders = [];
     private string $basePath;
     private Container $container;
     private Dispatcher $dispatcher;
@@ -33,6 +34,12 @@ class Application
     public function providers(array $providers): static
     {
         $this->providers = $providers;
+        return $this;
+    }
+
+    public function routeProviders(array $providers): static
+    {
+        $this->routeProviders = $providers;
         return $this;
     }
 
@@ -77,8 +84,22 @@ class Application
 
         if ($useCache && file_exists($cachePath)) {
             $router->loadFromCache($cachePath);
-        } elseif ($useCache) {
-            $router->saveToCache($cachePath);
+        } else {
+            foreach ($this->routeProviders as $providerClass) {
+                $provider = new $providerClass();
+
+                if (!$provider instanceof ServiceProvider) {
+                    throw new \RuntimeException("{$providerClass} must implement ServiceProvider");
+                }
+
+                $provider->register($this->container);
+            }
+
+            $router->register(\Antares\OpenApi\OpenApiController::class);
+
+            if ($useCache) {
+                $router->saveToCache($cachePath);
+            }
         }
 
         $router->register(\Antares\OpenApi\OpenApiController::class);
