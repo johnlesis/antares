@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Antares\Console;
 
+use Antares\Console\Commands\CacheClear;
 use Antares\Console\Commands\MakeController;
 use Antares\Console\Commands\MakeDto;
 
@@ -12,6 +13,7 @@ final class Kernel
     private array $commands = [
         'make:controller' => MakeController::class,
         'make:dto'        => MakeDto::class,
+        'cache:clear'     => CacheClear::class,
     ];
 
     public function handle(array $argv): void

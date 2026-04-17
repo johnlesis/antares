@@ -70,8 +70,18 @@ class Application
             }
             $provider->register($this->container);
         }
-        $router = $this->container->make(Router::class);
-        $router->register(OpenApiController::class);
+
+        $router    = $this->container->make(Router::class);
+        $cachePath = $this->basePath . '/storage/cache/routes.php';
+        $useCache  = ($_ENV['APP_ENV'] ?? 'local') === 'production';
+
+        if ($useCache && file_exists($cachePath)) {
+            $router->loadFromCache($cachePath);
+        } elseif ($useCache) {
+            $router->saveToCache($cachePath);
+        }
+
+        $router->register(\Antares\OpenApi\OpenApiController::class);
         $this->dispatcher = new Dispatcher($this->container, $router, new Hydrator(new Validator()));
         $this->errorHandler = new ErrorHandler();
     }
