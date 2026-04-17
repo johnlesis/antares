@@ -14,7 +14,13 @@ final class RouteServiceProvider implements ServiceProvider
     {
         $router = $container->make(Router::class);
         
+        // Option 1 — attribute based (default, recommended)
         $router->register(PatientController::class);
-        // $router->register(UserController::class);
+
+        // Option 2 — PHP config file
+        $router->registerFromConfig(require 'config/routes.php');
+
+        // Option 3 — YAML (requires composer require symfony/yaml)
+        // $router->registerFromYaml('config/routes.yaml');
     }
 }
