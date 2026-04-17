@@ -22,6 +22,9 @@ namespace App\Controllers;
 
 use Antares\Router\Attributes\Get;
 use Antares\Router\Attributes\Post;
+use Antares\Router\Attributes\Put;
+use Antares\Router\Attributes\Patch;
+use Antares\Router\Attributes\Delete;
 
 final class {$name}
 {
