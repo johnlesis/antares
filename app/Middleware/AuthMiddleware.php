@@ -11,10 +11,21 @@ use Psr\Http\Message\ResponseInterface;
 
 final class AuthMiddleware implements MiddlewareInterface
 {
+     private array $excluded = [
+        '/openapi.json',
+        '/docs',
+    ];
+
     public function handle(
         ServerRequestInterface $request,
         callable $next
     ): ResponseInterface {
+        $path = $request->getUri()->getPath();
+
+        if (in_array($path, $this->excluded)) {
+            return $next($request);
+        }
+
         $token = $request->getHeaderLine('Authorization');
 
         if (empty($token)) {

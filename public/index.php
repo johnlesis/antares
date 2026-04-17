@@ -13,7 +13,7 @@ Application::create(__DIR__ . '/..')
         AppServiceProvider::class,    // bindings, singletons
         RouteServiceProvider::class,  // controllers
     ])
-    ->middleware([
-        AuthMiddleware::class,
-    ])
+    // ->middleware([
+    //     AuthMiddleware::class,
+    // ])
     ->run();

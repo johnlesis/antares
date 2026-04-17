@@ -1,4 +1,6 @@
-<?php declare (strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Antares;
 
@@ -7,6 +9,8 @@ use Psr\Http\Message\ResponseInterface;
 use Antares\Container\Container;
 use Antares\Hydration\Hydrator;
 use Antares\Middleware\Pipeline;
+use Antares\OpenApi\Generator;
+use Antares\OpenApi\OpenApiController;
 use Antares\Router\Router;
 use Antares\Validation\Validator;
 
@@ -54,6 +58,10 @@ class Application
     {
         $this->container = new Container();
         $this->container->singleton(Router::class, fn() => new Router());
+        $this->container->singleton(
+            Generator::class,
+            fn() => new Generator($this->container->make(Router::class))
+        );
 
         foreach ($this->providers as $providerClass) {
             $provider = new $providerClass();
@@ -62,8 +70,8 @@ class Application
             }
             $provider->register($this->container);
         }
-
         $router = $this->container->make(Router::class);
+        $router->register(OpenApiController::class);
         $this->dispatcher = new Dispatcher($this->container, $router, new Hydrator(new Validator()));
         $this->errorHandler = new ErrorHandler();
     }
@@ -92,5 +100,4 @@ class Application
             return $this->errorHandler->handle($e);
         }
     }
-
 }
