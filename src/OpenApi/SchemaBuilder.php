@@ -11,6 +11,10 @@ use Antares\Validation\Attributes\MinLength;
 use Antares\Validation\Attributes\MaxLength;
 use Antares\Validation\Attributes\Pattern;
 use Antares\Validation\Attributes\ValidationAttribute;
+use Antares\Serialization\Attributes\Hide;
+use Antares\Serialization\Attributes\SerializeAs;
+use Antares\Serialization\Attributes\ResponseDto;
+use Antares\Support\CaseConverter;
 
 final class SchemaBuilder
 {
@@ -19,15 +23,26 @@ final class SchemaBuilder
         $reflection = new \ReflectionClass($dtoClass);
         $parameters = $reflection->getConstructor()->getParameters();
 
+        $responseDtoAttr = $reflection->getAttributes(ResponseDto::class);
+        $case = !empty($responseDtoAttr) ? $responseDtoAttr[0]->newInstance()->case : null;
+
         $properties = [];
         $required   = [];
 
         foreach ($parameters as $parameter) {
             $name = $parameter->getName();
             $type = $parameter->getType();
+            if (!empty($parameter->getAttributes(Hide::class))) {
+                continue;
+            }
+
+            $serializeAs = $parameter->getAttributes(SerializeAs::class);
+            $name = !empty($serializeAs)
+                ? $serializeAs[0]->newInstance()->name
+                : ($case ? CaseConverter::convert($name, $case) : $parameter->getName());
             
             if ($type === null) {
-                $properties[$parameter->getName()] = ['type' => 'string'];
+                $properties[$name] = ['type' => 'string'];
                 continue;
             }
 

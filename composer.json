@@ -35,7 +35,6 @@
     "autoload": {
         "psr-4": {
             "Antares\\": "src/",
-            "App\\": "app/"
         }
     },
     "require-dev": {

@@ -5,6 +5,7 @@ use Antares\Container\Container;
 use Antares\Exceptions\HttpException;
 use Antares\Hydration\Hydrator;
 use Antares\Router\Router;
+use Antares\Serialization\Serializer;
 use Exception;
 use Nyholm\Psr7\Response;
 use Psr\Http\Message\ServerRequestInterface;
@@ -14,6 +15,7 @@ final class Dispatcher
         private readonly Container $container,
         private readonly Router $router,
         private readonly Hydrator $hydrator,
+        private readonly Serializer $serializer
     ) {}
 
     public function dispatch(
@@ -101,10 +103,13 @@ final class Dispatcher
         if ($result instanceof Response) {
             return $result;
         }
+
         $body = match(true) {
             $result === null   => '',
             is_array($result)  => json_encode($result),
-            is_object($result) => json_encode(get_object_vars($result)),
+            is_object($result) => $this->isResponseDto($result)
+                ? json_encode($this->serializer->serialize($result))
+                : json_encode(get_object_vars($result)),
             default            => json_encode($result),
         };
         return new Response(
@@ -112,5 +117,11 @@ final class Dispatcher
             headers: ['Content-Type' => 'application/json'],
             body: $body,
         );
+    }
+
+    private function isResponseDto(object $result): bool
+    {
+        $reflection = new \ReflectionClass($result);
+        return !empty($reflection->getAttributes(\Antares\Serialization\Attributes\ResponseDto::class));
     }
 }
