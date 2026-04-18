@@ -63,6 +63,9 @@ class Application
 
     public function boot(): void
     {
+        $dotenv = \Dotenv\Dotenv::createImmutable($this->basePath);
+        $dotenv->safeLoad();
+        
         $_ENV['APP_BASE_PATH'] = $this->basePath;
         $this->container = new Container();
         $this->container->singleton(Router::class, fn() => new Router());
