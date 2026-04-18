@@ -63,6 +63,7 @@ class Application
 
     public function boot(): void
     {
+        $_ENV['APP_BASE_PATH'] = $this->basePath;
         $this->container = new Container();
         $this->container->singleton(Router::class, fn() => new Router());
         $this->container->singleton(
