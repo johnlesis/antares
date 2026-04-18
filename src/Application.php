@@ -10,8 +10,8 @@ use Antares\Container\Container;
 use Antares\Hydration\Hydrator;
 use Antares\Middleware\Pipeline;
 use Antares\OpenApi\Generator;
-use Antares\OpenApi\OpenApiController;
 use Antares\Router\Router;
+use Antares\Serialization\Serializer;
 use Antares\Validation\Validator;
 
 class Application
@@ -70,6 +70,14 @@ class Application
             fn() => new Generator($this->container->make(Router::class))
         );
 
+        foreach ($this->discoverProviders() as $providerClass) {
+            $provider = new $providerClass();
+            if (!$provider instanceof ServiceProvider) {
+                continue;
+            }
+            $provider->register($this->container);
+        }
+
         foreach ($this->providers as $providerClass) {
             $provider = new $providerClass();
             if (!$provider instanceof ServiceProvider) {
@@ -80,14 +88,18 @@ class Application
 
         $router    = $this->container->make(Router::class);
         $cachePath = $this->basePath . '/storage/cache/routes.php';
+        $fingerprintPath = $this->basePath . '/storage/cache/fingerprint';
         $useCache  = ($_ENV['APP_ENV'] ?? 'local') === 'production';
 
-        if ($useCache && file_exists($cachePath)) {
+        $currentFingerprint = $this->generateFingerprint();
+        $cachedFingerprint  = file_exists($fingerprintPath) ? file_get_contents($fingerprintPath) : null;
+        $fingerprintMatch   = $currentFingerprint === $cachedFingerprint;
+
+        if ($useCache && file_exists($cachePath) && $fingerprintMatch) {
             $router->loadFromCache($cachePath);
         } else {
             foreach ($this->routeProviders as $providerClass) {
                 $provider = new $providerClass();
-
                 if (!$provider instanceof ServiceProvider) {
                     throw new \RuntimeException("{$providerClass} must implement ServiceProvider");
                 }
@@ -99,11 +111,11 @@ class Application
 
             if ($useCache) {
                 $router->saveToCache($cachePath);
+                file_put_contents($fingerprintPath, $currentFingerprint);
             }
         }
 
-        $router->register(\Antares\OpenApi\OpenApiController::class);
-        $this->dispatcher = new Dispatcher($this->container, $router, new Hydrator(new Validator()));
+        $this->dispatcher = new Dispatcher($this->container, $router, new Hydrator(new Validator()), new Serializer());
         $this->errorHandler = new ErrorHandler();
     }
 
@@ -130,5 +142,66 @@ class Application
         } catch (\Throwable $e) {
             return $this->errorHandler->handle($e);
         }
+    }
+
+    private function generateFingerprint(): string
+    {
+        $composerLock = $this->basePath . '/composer.lock';
+        $env          = $this->basePath . '/.env';
+        $appDir       = $this->basePath . '/app';
+
+        $hash = '';
+
+        if (file_exists($composerLock)) {
+            $hash .= md5_file($composerLock);
+        }
+
+        if (file_exists($env)) {
+            $hash .= md5_file($env);
+        }
+
+        if (is_dir($appDir)) {
+            $hash .= $this->hashDirectory($appDir);
+        }
+
+        return md5($hash);
+    }
+
+    private function hashDirectory(string $dir): string
+    {
+        $hash  = '';
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir));
+
+        foreach ($files as $file) {
+            if ($file->isFile()) {
+                $hash .= md5_file($file->getPathname());
+            }
+        }
+
+        return md5($hash);
+    }
+
+    private function discoverProviders(): array
+    {
+        $installedPath = $this->basePath . '/vendor/composer/installed.json';
+
+        if (!file_exists($installedPath)) {
+            return [];
+        }
+
+        $installed = json_decode(file_get_contents($installedPath), true);
+        $packages  = $installed['packages'] ?? $installed;
+        $providers = [];
+
+        foreach ($packages as $package) {
+            $discovered = $package['extra']['antares']['providers'] ?? [];
+            foreach ($discovered as $provider) {
+                if (!in_array($provider, $this->providers, strict: true)) {
+                    $providers[] = $provider;
+                }
+            }
+        }
+
+        return $providers;
     }
 }

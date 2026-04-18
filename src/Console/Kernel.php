@@ -7,12 +7,18 @@ namespace Antares\Console;
 use Antares\Console\Commands\CacheClear;
 use Antares\Console\Commands\MakeController;
 use Antares\Console\Commands\MakeDto;
+use Antares\Console\Commands\MakeGuard;
+use Antares\Console\Commands\MakeMiddleware;
+use Antares\Console\Commands\MakeResponse;
 
 final class Kernel
 {
     private array $commands = [
         'make:controller' => MakeController::class,
         'make:dto'        => MakeDto::class,
+        'make:response'   => MakeResponse::class,
+        'make:middleware' => MakeMiddleware::class,
+        'make:guard'      => MakeGuard::class,
         'cache:clear'     => CacheClear::class,
     ];
 
@@ -29,6 +35,14 @@ final class Kernel
 
         $command = $argv[1];
         $name    = $argv[2] ?? null;
+        $path    = null;
+
+        foreach ($argv as $arg) {
+            if (str_starts_with($arg, '--path=')) {
+                $path = substr($arg, 7);
+                break;
+            }
+        }
 
         if (!isset($this->commands[$command])) {
             echo "Unknown command: {$command}\n";
@@ -37,6 +51,6 @@ final class Kernel
         }
 
         $commandClass = $this->commands[$command];
-        (new $commandClass())->handle($name);
+        (new $commandClass())->handle($name, $path);
     }
 }

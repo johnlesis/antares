@@ -16,5 +16,10 @@ final class CacheClear
         } else {
             echo "No cache to clear.\n";
         }
+
+        $fingerprintPath = getcwd() . '/storage/cache/fingerprint';
+        if (file_exists($fingerprintPath)) {
+            unlink($fingerprintPath);
+        }
     }
 }

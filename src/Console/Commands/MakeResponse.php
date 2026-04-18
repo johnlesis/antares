@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Antares\Console\Commands;
 
-final class MakeDto extends GeneratorCommand
+final class MakeResponse extends GeneratorCommand
 {
     protected function getPath(string $name): string
     {
-        return getcwd() . "/app/DTOs/{$name}.php";
+        return getcwd() . "/app/Responses/{$name}.php";
     }
 
     protected function getStub(string $name): string
@@ -18,11 +18,13 @@ final class MakeDto extends GeneratorCommand
 
 declare(strict_types=1);
 
-namespace App\DTOs;
+namespace App\Responses;
 
-use Antares\Validation\Attributes\Dto;
+use Antares\Serialization\Attributes\ResponseDto;
+use Antares\Serialization\Attributes\Hide;
+use Antares\Serialization\Attributes\SerializeAs;
 
-#[Dto]
+#[ResponseDto(case: 'snake_case')]
 final readonly class {$name}
 {
     public function __construct(
