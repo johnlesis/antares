@@ -3,12 +3,15 @@ declare(strict_types=1);
 namespace Antares;
 use Antares\Container\Container;
 use Antares\Exceptions\HttpException;
+use Antares\Http\Attributes\Guards;
 use Antares\Hydration\Hydrator;
 use Antares\Router\Router;
 use Antares\Serialization\Serializer;
+use Antares\Validation\Attributes\Dto;
 use Exception;
 use Nyholm\Psr7\Response;
 use Psr\Http\Message\ServerRequestInterface;
+
 final class Dispatcher
 {
     public function __construct(
@@ -42,6 +45,13 @@ final class Dispatcher
     ): mixed {
         $type = $parameter->getType();
 
+        $guardsAttr = $parameter->getAttributes(Guards::class);
+        if (!empty($guardsAttr)) {
+            $guardClass = $guardsAttr[0]->newInstance()->guardClass;
+            $guard = $this->container->make($guardClass);
+            return $guard->resolve($request);
+        }
+
         if (!$type instanceof \ReflectionNamedType) {
             if ($parameter->isDefaultValueAvailable()) {
                 return $parameter->getDefaultValue();
@@ -60,7 +70,8 @@ final class Dispatcher
         }
 
         if (!$type->isBuiltin()) {
-            if ((new \ReflectionClass($typeName))->isReadOnly()) {
+            $ref = new \ReflectionClass($typeName);
+            if (!empty($ref->getAttributes(Dto::class))) {
                 $rawBody = (string) $request->getBody();
                 if (!empty($rawBody) && json_decode($rawBody) === null) {
                     throw new HttpException(400, "Invalid JSON body");
