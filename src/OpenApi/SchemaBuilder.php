@@ -15,6 +15,20 @@ use Antares\Serialization\Attributes\Hide;
 use Antares\Serialization\Attributes\SerializeAs;
 use Antares\Serialization\Attributes\ResponseDto;
 use Antares\Support\CaseConverter;
+use Antares\Validation\Attributes\ArrayOf;
+use Antares\Validation\Attributes\Between;
+use Antares\Validation\Attributes\Date;
+use Antares\Validation\Attributes\DateTime;
+use Antares\Validation\Attributes\HexColor;
+use Antares\Validation\Attributes\In;
+use Antares\Validation\Attributes\Ip;
+use Antares\Validation\Attributes\Json;
+use Antares\Validation\Attributes\Negative;
+use Antares\Validation\Attributes\Phone;
+use Antares\Validation\Attributes\Positive;
+use Antares\Validation\Attributes\Size;
+use Antares\Validation\Attributes\Uuid;
+use Soap\Url;
 
 final class SchemaBuilder
 {
@@ -90,18 +104,32 @@ final class SchemaBuilder
     private function mapAttributtes(array $property, array $attributes): array
     {
         foreach ($attributes as $attribute) {
-                $instance   = $attribute->newInstance();
-                $constraint = match(true) {
-                    $instance instanceof MinLength => ['minLength' => $instance->minLength],
-                    $instance instanceof MaxLength => ['maxLength' => $instance->maxLength],
-                    $instance instanceof Min       => ['minimum'   => $instance->min],
-                    $instance instanceof Max       => ['maximum'   => $instance->max],
-                    $instance instanceof Email     => ['format'    => 'email'],
-                    $instance instanceof Pattern   => ['pattern'   => $instance->regex],
-                    default                        => [],
-                };
-                $property = array_merge($property, $constraint);
-            }
-            return $property;
+            $instance   = $attribute->newInstance();
+            $constraint = match(true) {
+                $instance instanceof MinLength    => ['minLength' => $instance->minLength],
+                $instance instanceof MaxLength    => ['maxLength' => $instance->maxLength],
+                $instance instanceof Min          => ['minimum'   => $instance->min],
+                $instance instanceof Max          => ['maximum'   => $instance->max],
+                $instance instanceof Email        => ['format'    => 'email'],
+                $instance instanceof Pattern      => ['pattern'   => $instance->regex],
+                $instance instanceof Uuid         => ['format'    => 'uuid'],
+                $instance instanceof Url          => ['format'    => 'uri'],
+                $instance instanceof Date         => ['format'    => 'date'],
+                $instance instanceof DateTime     => ['format'    => 'date-time'],
+                $instance instanceof Ip           => ['format'    => 'ipv4'],
+                $instance instanceof HexColor     => ['pattern'   => '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$'],
+                $instance instanceof Json         => ['type'      => 'string', 'format' => 'json'],
+                $instance instanceof Between      => ['minimum'   => $instance->min, 'maximum' => $instance->max],
+                $instance instanceof Size         => ['minLength' => $instance->min, 'maxLength' => $instance->max],
+                $instance instanceof Positive     => ['minimum'   => 1],
+                $instance instanceof Negative     => ['maximum'   => -1],
+                $instance instanceof In           => ['enum'      => $instance->values],
+                $instance instanceof Phone        => ['pattern'   => '^\+?[0-9\s\-\(\)]{7,20}$'],
+                $instance instanceof ArrayOf      => ['type'      => 'array', 'items' => ['$ref' => '#/components/schemas/' . (new \ReflectionClass($instance->type))->getShortName()]],
+                default                           => [],
+            };
+            $property = array_merge($property, $constraint);
+        }
+        return $property;
     }
 }
