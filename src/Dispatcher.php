@@ -8,9 +8,12 @@ use Antares\Hydration\Hydrator;
 use Antares\Router\Router;
 use Antares\Serialization\Serializer;
 use Antares\Validation\Attributes\Dto;
+use Antares\Validation\Attributes\File;
+use Antares\Validation\Exceptions\ValidationException;
 use Exception;
 use Nyholm\Psr7\Response;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 
 final class Dispatcher
 {
@@ -63,6 +66,24 @@ final class Dispatcher
 
         if ($typeName === ServerRequestInterface::class) {
             return $request;
+        }
+        if ($typeName === UploadedFileInterface::class) {
+            $files = $request->getUploadedFiles();
+            $file = $files[$parameter->getName()] ?? null;
+
+            if ($file === null) {
+                throw new HttpException(400, "Missing file: {$parameter->getName()}");
+            }
+
+            $fileAttrs = $parameter->getAttributes(File::class);
+            if (!empty($fileAttrs)) {
+                $error = $fileAttrs[0]->newInstance()->validate($file);
+                if ($error !== null) {
+                    throw new ValidationException([$parameter->getName() => [$error]]);
+                }
+            }
+
+            return $file;
         }
 
         if (isset($routeParams[$parameter->getName()])) {
