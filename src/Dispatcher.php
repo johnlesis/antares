@@ -4,6 +4,7 @@ namespace Antares;
 use Antares\Container\Container;
 use Antares\Exceptions\HttpException;
 use Antares\Http\Attributes\Guards;
+use Antares\Http\ResponseBag;
 use Antares\Hydration\Hydrator;
 use Antares\Router\Router;
 use Antares\Serialization\Serializer;
@@ -140,11 +141,11 @@ final class Dispatcher
     private function buildResponse(mixed $result, int $statusCode): Response
     {
         if ($result instanceof Response) {
-            return $result;
+            return $this->applyResponseBag($result);
         }
 
         if ($result === null) {
-            return new Response(status: $statusCode);
+            return $this->applyResponseBag(new Response(status: $statusCode));
         }
 
         $body = match(true) {
@@ -155,11 +156,22 @@ final class Dispatcher
             default            => json_encode($result),
         };
 
-        return new Response(
+        return $this->applyResponseBag(new Response(
             status: $statusCode,
             headers: ['Content-Type' => 'application/json'],
             body: $body,
-        );
+        ));
+    }
+
+    private function applyResponseBag(Response $response): Response
+    {
+        foreach (ResponseBag::getHeaders() as $name => $value) {
+            $response = $response->withHeader($name, $value);
+        }
+
+        ResponseBag::clear();
+
+        return $response;
     }
 
     private function isResponseDto(object $result): bool
