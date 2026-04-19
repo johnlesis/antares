@@ -92,12 +92,19 @@ final class Dispatcher
 
         if (!$type->isBuiltin()) {
             $ref = new \ReflectionClass($typeName);
-            if (!empty($ref->getAttributes(Dto::class))) {
+           if (!empty($ref->getAttributes(Dto::class))) {
                 $rawBody = (string) $request->getBody();
-                if (!empty($rawBody) && json_decode($rawBody) === null) {
-                    throw new HttpException(400, "Invalid JSON body");
+                $contentType = $request->getHeaderLine('Content-Type');
+
+                if (str_contains($contentType, 'application/x-www-form-urlencoded') || str_contains($contentType, 'multipart/form-data')) {
+                    $data = $request->getParsedBody() ?? [];
+                } else {
+                    if (!empty($rawBody) && json_decode($rawBody) === null) {
+                        throw new HttpException(400, "Invalid JSON body");
+                    }
+                    $data = json_decode($rawBody, true) ?? [];
                 }
-                return $this->hydrator->hydrate($typeName, json_decode($rawBody, true) ?? []);
+                return $this->hydrator->hydrate($typeName, $data);
             }
             return $this->container->make($typeName);
         }
@@ -136,14 +143,18 @@ final class Dispatcher
             return $result;
         }
 
+        if ($result === null) {
+            return new Response(status: $statusCode);
+        }
+
         $body = match(true) {
-            $result === null   => '',
             is_array($result)  => json_encode($result),
             is_object($result) => $this->isResponseDto($result)
                 ? json_encode($this->serializer->serialize($result))
                 : json_encode(get_object_vars($result)),
             default            => json_encode($result),
         };
+
         return new Response(
             status: $statusCode,
             headers: ['Content-Type' => 'application/json'],
