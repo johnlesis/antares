@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Antares\OpenApi;
 
+use Antares\OpenApi\Attributes\Deprecated;
 use Antares\Router\Router;
+use Antares\Serialization\Attributes\ResponseDto;
+use Antares\Validation\Attributes\Dto;
 
 final class Generator
 {
@@ -29,19 +32,26 @@ final class Generator
             if (in_array($route[1], $excluded)) {
                 continue;
             }
-            $path = $this->pathBuilder->build($route);
-            $paths = array_merge_recursive($paths, $path);
-
             $controller = $route[2];
             $method     = $route[3];
             $reflection = new \ReflectionMethod($controller, $method);
+
+            $path = $this->pathBuilder->build($route);
+
+            if (!empty($reflection->getAttributes(Deprecated::class))) {
+                $httpMethod = strtolower($route[0]);
+                $routePath  = $route[1];
+                $path[$routePath][$httpMethod]['deprecated'] = true;
+            }
+
+            $paths = array_merge_recursive($paths, $path);
 
             foreach ($reflection->getParameters() as $parameter) {
                 $type = $parameter->getType();
                 if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
                     $typeName = $type->getName();
                     $ref = new \ReflectionClass($typeName);
-                    if ($ref->isReadOnly() && !isset($schemas[$typeName])) {
+                   if (!empty($ref->getAttributes(Dto::class)) && !isset($schemas[$typeName])) {
                         $schemas[$typeName] = $this->schemaBuilder->build($typeName);
                     }
                 }
@@ -51,7 +61,10 @@ final class Generator
             if ($returnType instanceof \ReflectionNamedType && !$returnType->isBuiltin()) {
                 $typeName = $returnType->getName();
                 if (class_exists($typeName) && !isset($schemas[$typeName])) {
-                    $schemas[$typeName] = $this->schemaBuilder->build($typeName);
+                    $ref = new \ReflectionClass($typeName);
+                    if (!empty($ref->getAttributes(ResponseDto::class))) {
+                        $schemas[$typeName] = $this->schemaBuilder->build($typeName);
+                    }
                 }
             }
         }
