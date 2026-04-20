@@ -10,16 +10,23 @@ use Antares\Console\Commands\MakeDto;
 use Antares\Console\Commands\MakeGuard;
 use Antares\Console\Commands\MakeMiddleware;
 use Antares\Console\Commands\MakeResponse;
+use Antares\Database\Migrate;
+use Antares\Database\MigrateRollback;
+use Antares\Console\Commands\MakeMigration;
 
 final class Kernel
 {
+
     private array $commands = [
-        'make:controller' => MakeController::class,
-        'make:dto'        => MakeDto::class,
-        'make:response'   => MakeResponse::class,
-        'make:middleware' => MakeMiddleware::class,
-        'make:guard'      => MakeGuard::class,
-        'cache:clear'     => CacheClear::class,
+        'make:controller'  => MakeController::class,
+        'make:dto'         => MakeDto::class,
+        'make:response'    => MakeResponse::class,
+        'make:middleware'  => MakeMiddleware::class,
+        'make:guard'       => MakeGuard::class,
+        'make:migration'   => MakeMigration::class,
+        'migrate'          => Migrate::class,
+        'migrate:rollback' => MigrateRollback::class,
+        'cache:clear'      => CacheClear::class,
     ];
 
     public function handle(array $argv): void
@@ -51,6 +58,15 @@ final class Kernel
         }
 
         $commandClass = $this->commands[$command];
-        (new $commandClass())->handle($name, $path);
+        $instance = new $commandClass();
+
+        if (method_exists($instance, 'handle')) {
+            $argCount = (new \ReflectionMethod($instance, 'handle'))->getNumberOfParameters();
+            if ($argCount === 0) {
+                $instance->handle();
+            } else {
+                $instance->handle($name, $path);
+            }
+        }
     }
 }
